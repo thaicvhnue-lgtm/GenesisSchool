@@ -9,7 +9,6 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
 
     <script>
         tailwind.config = {
@@ -31,14 +30,10 @@
 <body>
     <div id="root"></div>
 
-    <script type="text/babel" data-presets="react,typescript">
+    <script type="text/babel">
         const { useState, useEffect } = React;
-        // Lấy các icon từ thư viện Lucide
-        const { LayoutDashboard, Users, MessageSquare, Download, FileSpreadsheet, FileText, Settings, X, Camera, MessageCircle, Send, Flame } = lucide;
 
-        // --- 2. GIẢ LẬP DỮ LIỆU & COMPONENT CON (Vì thiếu file gốc) ---
-        
-        // Dữ liệu mẫu
+        // --- DỮ LIỆU GIẢ LẬP (MOCK DATA) ---
         const MOCK_CLASSES = [
             { id: 'c1', name: '6B1', grade: 6, room: 'P201', studentCount: 32 },
             { id: 'c2', name: '8A2', grade: 8, room: 'P305', studentCount: 28 }
@@ -55,139 +50,75 @@
             { id: 't2', title: 'Cần cố gắng', content: 'Con cần tập trung hơn trong giờ học.' }
         ];
 
-        // Component Giả lập (Placeholder) cho các Tab con
+        // --- CÁC COMPONENT CON (Giao diện từng tab) ---
+
         const OverviewTab = ({ students, classes }) => (
-            <div className="bg-white p-6 rounded-xl shadow-sm">
-                <h2 className="text-xl font-bold mb-4 text-indigo-600">📊 Tổng quan (Demo)</h2>
-                <div className="grid grid-cols-3 gap-4">
-                    <div className="p-4 bg-blue-50 rounded-lg">
+            <div className="bg-white p-6 rounded-xl shadow-sm animate-fade-in">
+                <h2 className="text-xl font-bold mb-4 text-indigo-600">📊 Tổng quan</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
                         <p className="text-sm text-gray-500">Tổng học sinh</p>
-                        <p className="text-2xl font-bold">{students.length}</p>
+                        <p className="text-3xl font-bold text-blue-700">{students.length}</p>
                     </div>
-                    <div className="p-4 bg-green-50 rounded-lg">
+                    <div className="p-4 bg-green-50 rounded-lg border border-green-100">
                         <p className="text-sm text-gray-500">Tổng lớp chủ nhiệm</p>
-                        <p className="text-2xl font-bold">{classes.length}</p>
+                        <p className="text-3xl font-bold text-green-700">{classes.length}</p>
+                    </div>
+                    <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
+                        <p className="text-sm text-gray-500">Cần nhận xét tuần này</p>
+                        <p className="text-3xl font-bold text-orange-700">5</p>
                     </div>
                 </div>
-                <p className="mt-4 text-gray-500 text-sm italic">*Đây là giao diện giả lập vì thiếu file OverviewTab.tsx</p>
             </div>
         );
 
-        const ClassTab = ({ classes, students, onUpdateStudent }) => (
-            <div className="bg-white p-6 rounded-xl shadow-sm">
-                <h2 className="text-xl font-bold mb-4 text-green-600">👥 Danh sách Lớp (Demo)</h2>
-                <ul className="space-y-2">
+        const ClassTab = ({ classes, students }) => (
+            <div className="bg-white p-6 rounded-xl shadow-sm animate-fade-in">
+                <h2 className="text-xl font-bold mb-4 text-green-600">👥 Quản lý Lớp & Học Sinh</h2>
+                <div className="space-y-4">
                     {classes.map(c => (
-                        <li key={c.id} className="p-3 border rounded-lg flex justify-between">
-                            <span>Lớp <b>{c.name}</b></span>
-                            <span className="bg-gray-100 px-2 rounded">{c.studentCount} HS</span>
-                        </li>
-                    ))}
-                </ul>
-                <div className="mt-6">
-                    <h3 className="font-bold mb-2">Danh sách học sinh mẫu:</h3>
-                    {students.map(s => (
-                        <div key={s.id} className="p-2 border-b text-sm flex justify-between">
-                            <span>{s.name}</span>
-                            <span>{s.grades.length > 0 ? "Đã có điểm" : "Chưa có điểm"}</span>
+                        <div key={c.id} className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
+                            <div className="flex justify-between items-center mb-2">
+                                <h3 className="font-bold text-lg">Lớp {c.name} (Phòng {c.room})</h3>
+                                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">{c.studentCount} HS</span>
+                            </div>
+                            <div className="pl-4 border-l-2 border-green-200">
+                                <p className="text-sm text-gray-500 mb-1">Danh sách học sinh (Demo):</p>
+                                {students.filter(s => s.classId === c.id).map(s => (
+                                    <div key={s.id} className="text-sm py-1 border-b border-gray-100 last:border-0 flex justify-between">
+                                        <span>👤 {s.name}</span>
+                                        <span className="font-mono text-gray-500">ID: {s.id}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     ))}
                 </div>
-                <p className="mt-4 text-gray-500 text-sm italic">*Đây là giao diện giả lập vì thiếu file ClassTab.tsx</p>
             </div>
         );
 
         const CommentsTab = () => (
-             <div className="bg-white p-6 rounded-xl shadow-sm">
-                <h2 className="text-xl font-bold mb-4 text-orange-600">🤖 Trợ lý AI (Demo)</h2>
-                <p>Tính năng tạo nhận xét tự động bằng AI sẽ hiển thị ở đây.</p>
+             <div className="bg-white p-6 rounded-xl shadow-sm animate-fade-in">
+                <h2 className="text-xl font-bold mb-4 text-orange-600">🤖 Trợ lý AI & Nhận xét</h2>
+                <div className="text-center py-10 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                    <div className="text-4xl mb-2">💬</div>
+                    <p className="text-gray-600 font-medium">Tính năng AI tạo nhận xét tự động</p>
+                    <p className="text-sm text-gray-400 mt-1">Chọn một học sinh để bắt đầu tạo nhận xét (Tính năng đang phát triển)</p>
+                </div>
             </div>
         );
 
-        // Mock Services
-        const exportToCSV = (data, name) => alert(`Đã xuất file Excel: ${name}.csv (Giả lập)`);
-        const generateClassReportPDF = (title) => alert(`Đã tạo PDF báo cáo: ${title} (Giả lập)`);
-
-        // --- 3. MAIN APP (CODE CỦA THẦY THÁI) ---
-        // (Tôi đã chỉnh sửa nhẹ phần import để chạy được trên browser)
+        // --- ỨNG DỤNG CHÍNH ---
 
         function App() {
             const [activeTab, setActiveTab] = useState('overview');
             const [semester, setSemester] = useState('HK1');
-            
-            // Navigation State
-            const [targetStudentId, setTargetStudentId] = useState(null);
-
-            // Teacher Info State
             const [teacherName, setTeacherName] = useState('Nguyễn Văn Thái');
-            const [teacherAvatar, setTeacherAvatar] = useState('https://picsum.photos/200');
+            const [teacherAvatar, setTeacherAvatar] = useState('https://ui-avatars.com/api/?name=Thai+Nguyen&background=0D8ABC&color=fff');
             const [isEditingTeacher, setIsEditingTeacher] = useState(false);
-            const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
-            const [feedbackText, setFeedbackText] = useState('');
-            
-            // Gamification State
-            const [streak, setStreak] = useState(0);
+            const [streak, setStreak] = useState(5);
 
-            // Global State
-            const [classes, setClasses] = useState(MOCK_CLASSES);
-            const [students, setStudents] = useState(MOCK_STUDENTS);
-            const [templates, setTemplates] = useState(MOCK_TEMPLATES);
-
-            // Initialize Streak Logic
-            useEffect(() => {
-                const checkStreak = () => {
-                    // Logic streak giản lược để demo
-                    setStreak(5); 
-                };
-                checkStreak();
-            }, []);
-
-            // Handler to jump to a student from Overview
-            const handleSuggestionClick = (studentId) => {
-                setTargetStudentId(studentId);
-                setActiveTab('classes');
-            };
-
-            // --- Student Actions (Simplified) ---
-            const updateStudent = (updatedStudent) => {
-                setStudents(prev => prev.map(s => s.id === updatedStudent.id ? updatedStudent : s));
-            };
-            const addStudent = (newStudent) => setStudents(prev => [...prev, newStudent]);
-            const addStudents = (newStudents) => setStudents(prev => [...prev, ...newStudents]);
-            const deleteStudent = (studentId) => {
-                if (window.confirm('Bạn có chắc chắn muốn xóa học sinh này?')) {
-                    setStudents(prev => prev.filter(s => s.id !== studentId));
-                }
-            };
-
-            // --- Class Actions ---
-            const addClass = (newClass) => setClasses(prev => [...prev, newClass]);
-            const updateClass = (updatedClass) => setClasses(prev => prev.map(c => c.id === updatedClass.id ? updatedClass : c));
-            const deleteClass = (classId) => {
-                if (window.confirm('Bạn có muốn xóa lớp này không?')) {
-                    setClasses(prev => prev.filter(c => c.id !== classId));
-                }
-            };
-
-            const handleExportAll = (type) => {
-                if (type === 'excel') {
-                    const data = students.map(s => ({
-                        ID: s.id, Name: s.name, ClassID: s.classId
-                    }));
-                    exportToCSV(data, 'School_Report');
-                } else {
-                    generateClassReportPDF("TOAN TRUONG", students, semester);
-                }
-            };
-
-            const submitFeedback = () => {
-                if(!feedbackText.trim()) return;
-                alert("Cảm ơn thầy/cô đã đóng góp ý kiến!");
-                setFeedbackText('');
-                setIsFeedbackOpen(false);
-            }
-
-            // Edit form state
+            // Fake edit logic
             const [tempName, setTempName] = useState(teacherName);
             const [tempAvatar, setTempAvatar] = useState(teacherAvatar);
 
@@ -197,98 +128,98 @@
                 setIsEditingTeacher(false);
             }
 
-            // GIAO DIỆN CHÍNH
             return (
                 <div className="min-h-screen bg-gray-50 font-sans text-gray-800 flex flex-col md:flex-row">
-                {/* Sidebar Navigation */}
-                <aside className="w-full md:w-64 bg-white border-r border-gray-200 flex flex-col md:fixed h-auto md:h-full z-10 transition-all duration-300">
-                    <div className="h-20 flex items-center justify-center md:justify-start md:px-6 border-b border-gray-100">
-                    <div className="flex items-center gap-2">
-                         <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white font-bold">G</div>
-                         <span className="font-bold text-lg text-green-700 tracking-tight">Genesis School</span>
-                    </div>
-                    </div>
-
-                    <nav className="flex-1 py-4 md:py-6 space-y-2 px-2 md:px-4 flex md:flex-col justify-around md:justify-start">
-                    <button onClick={() => setActiveTab('overview')} className={`w-full flex items-center justify-center md:justify-start p-3 rounded-xl transition-all duration-200 ${activeTab === 'overview' ? 'bg-green-50 text-green-700 shadow-sm font-semibold' : 'text-gray-500 hover:bg-gray-100'}`}>
-                        <LayoutDashboard size={22} />
-                        <span className="hidden md:block ml-3">Tổng quan</span>
-                    </button>
-
-                    <button onClick={() => setActiveTab('classes')} className={`w-full flex items-center justify-center md:justify-start p-3 rounded-xl transition-all duration-200 ${activeTab === 'classes' ? 'bg-green-50 text-green-700 shadow-sm font-semibold' : 'text-gray-500 hover:bg-gray-100'}`}>
-                        <Users size={22} />
-                        <span className="hidden md:block ml-3">Lớp học</span>
-                    </button>
-
-                    <button onClick={() => setActiveTab('comments')} className={`w-full flex items-center justify-center md:justify-start p-3 rounded-xl transition-all duration-200 ${activeTab === 'comments' ? 'bg-green-50 text-green-700 shadow-sm font-semibold' : 'text-gray-500 hover:bg-gray-100'}`}>
-                        <MessageSquare size={22} />
-                        <span className="hidden md:block ml-3">Nhận xét & AI</span>
-                    </button>
-                    </nav>
-                </aside>
-
-                {/* Main Content Area */}
-                <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto min-h-screen relative">
-                    <header className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">
-                                {activeTab === 'overview' && 'Tổng quan lớp học'}
-                                {activeTab === 'classes' && 'Quản lý Học sinh'}
-                                {activeTab === 'comments' && 'Thư viện & Trợ lý AI'}
-                            </h1>
-                            <p className="text-sm text-gray-500 mt-1">Hệ thống quản lý giáo dục Genesis School</p>
+                    
+                    {/* SIDEBAR */}
+                    <aside className="w-full md:w-64 bg-white border-r border-gray-200 flex flex-col md:fixed h-auto md:h-full z-10">
+                        <div className="h-20 flex items-center justify-center md:justify-start md:px-6 border-b border-gray-100">
+                             <div className="flex items-center gap-2">
+                                 <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">G</div>
+                                 <span className="font-bold text-lg text-green-700 tracking-tight">Genesis School</span>
+                             </div>
                         </div>
-                        
-                        <div className="flex items-center gap-3 bg-white p-2 rounded-xl shadow-sm border border-gray-200">
-                            {/* Streak */}
-                            <div className="hidden sm:flex items-center gap-1 px-3 py-1 bg-orange-50 text-orange-600 rounded-lg border border-orange-100">
-                                <Flame size={18} className="fill-orange-500 animate-pulse" />
-                                <span className="font-bold text-sm">{streak} ngày</span>
-                            </div>
 
-                            <div className="flex flex-col px-2 border-l border-gray-100 pl-4">
-                                <span className="text-[10px] text-gray-400 font-bold uppercase">Học kì</span>
-                                <select value={semester} onChange={(e) => setSemester(e.target.value)} className="text-sm font-bold text-green-700 bg-transparent outline-none border-none p-0">
-                                    <option value="HK1">Học kì I</option>
-                                    <option value="HK2">Học kì II</option>
-                                </select>
-                            </div>
+                        <nav className="flex-1 py-4 md:py-6 space-y-2 px-2 md:px-4 flex md:flex-col justify-around md:justify-start">
+                            <button onClick={() => setActiveTab('overview')} className={`w-full flex items-center justify-center md:justify-start p-3 rounded-xl transition-all duration-200 ${activeTab === 'overview' ? 'bg-green-50 text-green-700 shadow-sm font-semibold' : 'text-gray-500 hover:bg-gray-100'}`}>
+                                <span className="text-xl">📊</span>
+                                <span className="hidden md:block ml-3">Tổng quan</span>
+                            </button>
 
-                            <div className="flex items-center space-x-2 pr-2 cursor-pointer hover:bg-gray-50 rounded-lg p-1" onClick={() => { setTempName(teacherName); setTempAvatar(teacherAvatar); setIsEditingTeacher(true); }}>
-                                <div className="text-right hidden sm:block">
-                                    <p className="text-xs font-semibold text-gray-700">{teacherName}</p>
-                                    <p className="text-[10px] text-gray-400">Giáo viên CN</p>
+                            <button onClick={() => setActiveTab('classes')} className={`w-full flex items-center justify-center md:justify-start p-3 rounded-xl transition-all duration-200 ${activeTab === 'classes' ? 'bg-green-50 text-green-700 shadow-sm font-semibold' : 'text-gray-500 hover:bg-gray-100'}`}>
+                                <span className="text-xl">👥</span>
+                                <span className="hidden md:block ml-3">Lớp học</span>
+                            </button>
+
+                            <button onClick={() => setActiveTab('comments')} className={`w-full flex items-center justify-center md:justify-start p-3 rounded-xl transition-all duration-200 ${activeTab === 'comments' ? 'bg-green-50 text-green-700 shadow-sm font-semibold' : 'text-gray-500 hover:bg-gray-100'}`}>
+                                <span className="text-xl">💬</span>
+                                <span className="hidden md:block ml-3">Nhận xét & AI</span>
+                            </button>
+                        </nav>
+                    </aside>
+
+                    {/* MAIN CONTENT */}
+                    <main className="flex-1 md:ml-64 p-4 md:p-8 min-h-screen">
+                        <header className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div>
+                                <h1 className="text-2xl font-bold text-gray-900">
+                                    {activeTab === 'overview' && 'Tổng quan lớp học'}
+                                    {activeTab === 'classes' && 'Quản lý Học sinh'}
+                                    {activeTab === 'comments' && 'Thư viện & Trợ lý AI'}
+                                </h1>
+                                <p className="text-sm text-gray-500 mt-1">Hệ thống quản lý giáo dục Genesis School</p>
+                            </div>
+                            
+                            <div className="flex items-center gap-3 bg-white p-2 rounded-xl shadow-sm border border-gray-200">
+                                <div className="hidden sm:flex items-center gap-1 px-3 py-1 bg-orange-50 text-orange-600 rounded-lg border border-orange-100">
+                                    <span>🔥</span>
+                                    <span className="font-bold text-sm">{streak} ngày</span>
                                 </div>
-                                <img src={teacherAvatar} alt="Profile" className="w-9 h-9 rounded-full border-2 border-green-100 object-cover" />
+
+                                <div className="flex flex-col px-2 border-l border-gray-100 pl-4">
+                                    <span className="text-[10px] text-gray-400 font-bold uppercase">Học kì</span>
+                                    <select value={semester} onChange={(e) => setSemester(e.target.value)} className="text-sm font-bold text-green-700 bg-transparent outline-none border-none p-0 cursor-pointer">
+                                        <option value="HK1">Học kì I</option>
+                                        <option value="HK2">Học kì II</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex items-center space-x-2 pr-2 cursor-pointer hover:bg-gray-50 rounded-lg p-1" onClick={() => { setTempName(teacherName); setTempAvatar(teacherAvatar); setIsEditingTeacher(true); }}>
+                                    <div className="text-right hidden sm:block">
+                                        <p className="text-xs font-semibold text-gray-700">{teacherName}</p>
+                                        <p className="text-[10px] text-gray-400">Giáo viên CN</p>
+                                    </div>
+                                    <img src={teacherAvatar} alt="Profile" className="w-9 h-9 rounded-full border-2 border-green-100 object-cover" />
+                                </div>
                             </div>
+                        </header>
+
+                        {/* CONTENT AREA */}
+                        <div className="relative z-10">
+                            {activeTab === 'overview' && <OverviewTab students={MOCK_STUDENTS} classes={MOCK_CLASSES} />}
+                            {activeTab === 'classes' && <ClassTab classes={MOCK_CLASSES} students={MOCK_STUDENTS} />}
+                            {activeTab === 'comments' && <CommentsTab />}
                         </div>
-                    </header>
 
-                    <div className="relative z-10">
-                        {activeTab === 'overview' && <OverviewTab students={students} classes={classes} semester={semester} />}
-                        {activeTab === 'classes' && <ClassTab classes={classes} students={students} onUpdateStudent={updateStudent} />}
-                        {activeTab === 'comments' && <CommentsTab />}
-                    </div>
-
-                    {/* Edit Teacher Modal */}
-                    {isEditingTeacher && (
-                        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
-                            <div className="bg-white rounded-xl shadow-2xl p-6 w-96 relative">
-                                <button onClick={() => setIsEditingTeacher(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={20} /></button>
-                                <h3 className="text-lg font-bold text-gray-800 mb-4">Thông tin Giáo viên</h3>
-                                <div className="flex flex-col items-center mb-4">
-                                    <img src={tempAvatar} className="w-20 h-20 rounded-full border-4 border-gray-100 mb-2" />
-                                    <input type="text" placeholder="URL Ảnh" value={tempAvatar} onChange={(e) => setTempAvatar(e.target.value)} className="text-xs border-b w-full p-1 text-center" />
+                        {/* EDIT MODAL */}
+                        {isEditingTeacher && (
+                            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+                                <div className="bg-white rounded-xl shadow-2xl p-6 w-96 relative">
+                                    <button onClick={() => setIsEditingTeacher(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-xl">×</button>
+                                    <h3 className="text-lg font-bold text-gray-800 mb-4">Thông tin Giáo viên</h3>
+                                    <div className="flex flex-col items-center mb-4">
+                                        <img src={tempAvatar} className="w-20 h-20 rounded-full border-4 border-gray-100 mb-2" />
+                                        <input type="text" placeholder="URL Ảnh" value={tempAvatar} onChange={(e) => setTempAvatar(e.target.value)} className="text-xs border-b w-full p-1 text-center" />
+                                    </div>
+                                    <div className="mb-4">
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Tên hiển thị</label>
+                                        <input type="text" value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full mt-1 p-2 border border-gray-300 rounded-lg text-sm" />
+                                    </div>
+                                    <button onClick={saveTeacherInfo} className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg">Lưu thay đổi</button>
                                 </div>
-                                <div className="mb-4">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Tên hiển thị</label>
-                                    <input type="text" value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full mt-1 p-2 border border-gray-300 rounded-lg text-sm" />
-                                </div>
-                                <button onClick={saveTeacherInfo} className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg">Lưu thay đổi</button>
                             </div>
-                        </div>
-                    )}
-                </main>
+                        )}
+                    </main>
                 </div>
             );
         }
