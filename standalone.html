@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduTrack Pro - Standalone</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5', // Indigo 600
+                        secondary: '#10B981', // Emerald 500
+                        accent: '#F59E0B', // Amber 500
+                        background: '#F3F4F6',
+                        surface: '#FFFFFF',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c7c7cc; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
+        input, select, textarea {
+            background-color: #ffffff !important;
+            color: #111827 !important;
+        }
+    </style>
+    <!-- Babel for in-browser JSX compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Import Maps for External Libraries -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "recharts": "https://esm.sh/recharts@2.12.0?external=react,react-dom",
+        "lucide-react": "https://esm.sh/lucide-react@0.330.0?external=react",
+        "@google/genai": "https://esm.sh/@google/genai@0.1.1",
+        "jspdf": "https://esm.sh/jspdf@2.5.1",
+        "jspdf-autotable": "https://esm.sh/jspdf-autotable@3.8.2",
+        "xlsx": "https://esm.sh/xlsx@0.18.5"
+      }
+    }
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useMemo, useRef } from 'react';
+        import ReactDOM from 'react-dom/client';
+        import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar } from 'recharts';
+        import { 
+            LayoutDashboard, Users, MessageSquare, Download, FileSpreadsheet, FileText, Settings, X, 
+            Camera, MessageCircle, Send, Plus, Trash2, Tag, Search, Wand2, Copy, Check, 
+            TrendingUp, Award, BookOpen, AlertCircle, CheckCircle, ChevronRight, Save, Star, 
+            Pencil, Upload, FileDown, MoreVertical, Edit, UserX, Calendar, Target, Clock, History, CloudUpload, Flame 
+        } from 'lucide-react';
+        import { GoogleGenAI } from '@google/genai';
+        import jsPDF from 'jspdf';
+        import 'jspdf-autotable';
+        import * as XLSX from 'xlsx';
+
+        // ==========================================
+        // TYPES & MOCK DATA (Merged from types.ts)
+        // ==========================================
+        
+        const SubjectType = {
+            GEOMETRY: 'Hình học',
+            ALGEBRA: 'Đại số/Số học',
+            GENERAL: 'Toán chung'
+        };
+
+        const ExamType = {
+            REGULAR: 'Ddtx',
+            MONTHLY: 'Tháng',
+            MIDTERM: 'GHK',
+            FINAL: 'CK'
+        };
+
+        const MOCK_CLASSES = [
+            { id: 'c1', name: 'Lớp 6A', gradeLevel: '6', year: '2023-2024' },
+            { id: 'c2', name: 'Lớp 9B', gradeLevel: '9', year: '2023-2024' },
+        ];
+
+        const MOCK_STUDENTS = [
+            {
+                id: 's1',
+                name: 'Nguyễn Văn An',
+                avatar: 'https://picsum.photos/200/200?random=1',
+                classId: 'c1',
+                targetGoal: 'Đạt học sinh giỏi môn Toán, cải thiện tính cẩn thận',
+                historicalNotes: 'Cấp 1 học tốt, tư duy nhanh nhưng hay ẩu.',
+                grades: [
+                    { id: 'g1', subject: SubjectType.ALGEBRA, examType: ExamType.REGULAR, coefficient: 1, score: 8, date: '2023-09-05' },
+                    { id: 'g2', subject: SubjectType.GEOMETRY, examType: ExamType.REGULAR, coefficient: 1, score: 7, date: '2023-09-10' },
+                    { id: 'g3', subject: SubjectType.GENERAL, examType: ExamType.MONTHLY, coefficient: 1, score: 7.5, date: '2023-10-01' },
+                ],
+                comments: [
+                    { id: 'cm1', content: 'Em cần tập trung hơn trong giờ Hình học.', date: '2023-10-12', source: 'manual' }
+                ],
+                dailyLogs: [
+                    { id: 'd1', date: '2023-09-15', category: 'Attitude', content: 'Hôm nay quên làm bài tập về nhà.' }
+                ]
+            },
+            {
+                id: 's2',
+                name: 'Trần Thị Bích',
+                avatar: 'https://picsum.photos/200/200?random=2',
+                classId: 'c1',
+                targetGoal: 'Thi đỗ vào trường chuyên Ngữ',
+                dailyLogs: [],
+                grades: [
+                    { id: 'g5', subject: SubjectType.ALGEBRA, examType: ExamType.REGULAR, coefficient: 1, score: 9.5, date: '2023-09-05' },
+                ],
+                comments: []
+            },
+            {
+                id: 's3',
+                name: 'Lê Hoàng Nam',
+                avatar: 'https://picsum.photos/200/200?random=3',
+                classId: 'c2',
+                dailyLogs: [],
+                grades: [],
+                comments: []
+            }
+        ];
+
+        const MOCK_TEMPLATES = [
+            { id: 't1', keyword: 'tot', content: 'Em học rất tốt và có thái độ tích cực trong giờ học.', category: 'Tích cực' },
+            { id: 't2', keyword: 'canuonnan', content: 'Em cần chú ý nghe giảng và làm bài tập về nhà đầy đủ hơn.', category: 'Cần cố gắng' },
+            { id: 't3', keyword: 'hinhhoc', content: 'Tư duy hình học tốt, cần phát huy.', category: 'Học tập' },
+        ];
+
+        // ==========================================
+        // SERVICES
+        // ==========================================
+
+        // --- Export Service ---
+        const removeVietnameseTones = (str) => {
+            str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g,"a"); 
+            str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g,"e"); 
+            str = str.replace(/ì|í|ị|ỉ|ĩ/g,"i"); 
+            str = str.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g,"o"); 
+            str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g,"u"); 
+            str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g,"y"); 
+            str = str.replace(/đ/g,"d");
+            str = str.replace(/À|Á|Ạ|Ả|Ã|Â|Ầ|Ấ|Ậ|Ẩ|Ẫ|Ă|Ằ|Ắ|Ặ|Ẳ|Ẵ/g, "A");
+            str = str.replace(/È|É|Ẹ|Ẻ|Ẽ|Ê|Ề|Ế|Ệ|Ể|Ễ/g, "E");
+            str = str.replace(/Ì|Í|Ị|Ỉ|Ĩ/g, "I");
+            str = str.replace(/Ò|Ó|Ọ|Ỏ|Õ|Ô|Ồ|Ố|Ộ|Ổ|Ỗ|Ơ|Ờ|Ớ|Ợ|Ở|Ỡ/g, "O");
+            str = str.replace(/Ù|Ú|Ụ|Ủ|Ũ|Ư|Ừ|Ứ|Ự|Ử|Ữ/g, "U");
+            str = str.replace(/Ỳ|Ý|Ỵ|Ỷ|Ỹ/g, "Y");
+            str = str.replace(/Đ/g, "D");
+            return str;
+        }
+
+        const exportToCSV = (data, filename) => {
+            if (data.length === 0) return;
+            const headers = Object.keys(data[0]);
+            const csvRows = [];
+            csvRows.push('\uFEFF' + headers.join(','));
+            for (const row of data) {
+                const values = headers.map(header => {
+                    const escaped = ('' + row[header]).replace(/"/g, '\\"');
+                    return `"${escaped}"`;
+                });
+                csvRows.push(values.join(','));
+            }
+            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', `${filename}.csv`);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        };
+
+        const generateStudentReportPDF = (student, className, semester) => {
+            const doc = new jsPDF();
+            doc.setFontSize(20);
+            doc.setTextColor(79, 70, 229);
+            doc.text("PHIEU KET QUA HOC TAP", 105, 20, { align: "center" });
+            
+            doc.setFontSize(12);
+            doc.setTextColor(0, 0, 0);
+            doc.text(`Ho ten: ${removeVietnameseTones(student.name)}`, 20, 40);
+            doc.text(`Lop: ${className}`, 20, 50);
+            doc.text(`Hoc ki: ${semester}`, 150, 40);
+            
+            const tableData = student.grades.map(g => [
+                removeVietnameseTones(g.subject),
+                g.score.toString(),
+                new Date(g.date).toLocaleDateString('vi-VN')
+            ]);
+
+            doc.autoTable({
+                startY: 60,
+                head: [['Mon Hoc', 'Diem So', 'Ngay']],
+                body: tableData,
+                theme: 'grid',
+                headStyles: { fillColor: [79, 70, 229] }
+            });
+
+            const finalY = doc.lastAutoTable.finalY || 60;
+            doc.text("Nhan xet:", 20, finalY + 15);
+            student.comments.forEach((c, index) => {
+                const yPos = finalY + 25 + (index * 10);
+                doc.setFontSize(10);
+                doc.text(`- ${removeVietnameseTones(c.content)}`, 20, yPos);
+            });
+            doc.save(`Report_${removeVietnameseTones(student.name)}.pdf`);
+        };
+
+        const generateClassReportPDF = (className, students, semester) => {
+            const doc = new jsPDF();
+            doc.setFontSize(18);
+            doc.text(`BANG DIEM TONG HOP - ${className}`, 105, 15, { align: "center" });
+            doc.setFontSize(12);
+            doc.text(`Hoc ki: ${semester}`, 105, 25, { align: "center" });
+
+            const tableData = students.map((s, index) => {
+                const avgScore = s.grades.length 
+                    ? (s.grades.reduce((a, b) => a + b.score, 0) / s.grades.length).toFixed(1) 
+                    : "N/A";
+                return [
+                    (index + 1).toString(),
+                    removeVietnameseTones(s.name),
+                    avgScore,
+                    s.grades.length.toString()
+                ];
+            });
+
+            doc.autoTable({
+                startY: 35,
+                head: [['STT', 'Ho Ten', 'Diem TB', 'So dau diem']],
+                body: tableData,
+                theme: 'striped',
+                headStyles: { fillColor: [16, 185, 129] }
+            });
+            doc.save(`Class_Report_${className}.pdf`);
+        };
+
+        // --- Excel Service ---
+        const getCoefficient = (type) => {
+            switch(type) {
+                case ExamType.MIDTERM: return 2;
+                case ExamType.FINAL: return 3;
+                default: return 1;
+            }
+        };
+
+        const downloadTemplate = () => {
+            const ws_data = [
+                ["", "", "", "", "", "", "ĐĐGtx", "", "", "", "", "", "", ""],
+                ["#", "Mã định danh", "Mã HS", "Họ và tên", "Tên tiếng", "Ngày sinh", "01", "02", "03", "04", "05", "ĐĐGgk", "ĐĐGck", "Nhận xét"]
+            ];
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            if(!ws['!merges']) ws['!merges'] = [];
+            ws['!merges'].push({ s: { r: 0, c: 6 }, e: { r: 0, c: 9 } });
+            ws['!cols'] = [
+                { wch: 5 }, { wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 10 }, { wch: 12 },
+                { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 8 }, { wch: 8 }, { wch: 30 }
+            ];
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Mau_Nhap_Lieu");
+            XLSX.writeFile(wb, "Genesis_Mau_Nhap_Diem.xlsx");
+        };
+
+        const parseStudentImportFile = async (file, classId) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target?.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const sheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[sheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                        let headerRowIndex = -1;
+                        for (let i = 0; i < Math.min(jsonData.length, 10); i++) {
+                            if (jsonData[i] && jsonData[i].includes("Mã HS")) {
+                                headerRowIndex = i;
+                                break;
+                            }
+                        }
+
+                        if (headerRowIndex === -1) {
+                            reject("Không tìm thấy cột 'Mã HS' trong file. Vui lòng sử dụng file mẫu chuẩn.");
+                            return;
+                        }
+
+                        const headers = jsonData[headerRowIndex];
+                        const colMap = {};
+                        headers.forEach((h, idx) => {
+                            if (typeof h === 'string') {
+                                colMap[h.trim()] = idx;
+                            }
+                        });
+
+                        const students = [];
+                        for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
+                            const row = jsonData[i];
+                            if (!row || row.length === 0) continue;
+                            const studentId = row[colMap["Mã HS"]];
+                            const name = row[colMap["Họ và tên"]];
+                            if (!studentId || !name) continue;
+
+                            const grades = [];
+                            const addGrade = (colName, examType, subject) => {
+                                 const scoreVal = row[colMap[colName]];
+                                 if (scoreVal !== undefined && scoreVal !== null && scoreVal !== "") {
+                                     const score = parseFloat(scoreVal);
+                                     if (!isNaN(score)) {
+                                         grades.push({
+                                             id: Date.now().toString() + Math.random().toString(),
+                                             subject: subject,
+                                             examType: examType,
+                                             coefficient: getCoefficient(examType),
+                                             score: score,
+                                             date: new Date().toISOString()
+                                         });
+                                     }
+                                 }
+                            };
+
+                            addGrade("01", ExamType.REGULAR, SubjectType.ALGEBRA);
+                            addGrade("02", ExamType.REGULAR, SubjectType.ALGEBRA);
+                            addGrade("03", ExamType.REGULAR, SubjectType.ALGEBRA);
+                            addGrade("04", ExamType.REGULAR, SubjectType.ALGEBRA);
+                            addGrade("05", ExamType.REGULAR, SubjectType.ALGEBRA);
+                            addGrade("ĐĐGgk", ExamType.MIDTERM, SubjectType.GENERAL);
+                            addGrade("ĐĐGck", ExamType.FINAL, SubjectType.GENERAL);
+
+                            const comments = [];
+                            const commentContent = row[colMap["Nhận xét"]];
+                            if (commentContent) {
+                                comments.push({
+                                    id: Date.now().toString() + Math.random().toString(),
+                                    content: String(commentContent),
+                                    date: new Date().toISOString(),
+                                    source: 'manual'
+                                });
+                            }
+
+                            students.push({
+                                id: String(studentId),
+                                name: String(name),
+                                avatar: `https://picsum.photos/200/200?random=${studentId}`,
+                                classId: classId,
+                                grades: grades,
+                                comments: comments,
+                                dailyLogs: []
+                            });
+                        }
+                        resolve(students);
+                    } catch (err) {
+                        console.error(err);
+                        reject("Lỗi khi đọc file Excel. Đảm bảo file đúng định dạng.");
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        };
+
+        // --- Gemini AI Service ---
+        // IMPORTANT: Replace with your actual API KEY or handle env vars
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "YOUR_API_KEY_HERE" });
+
+        const generateAIComment = async (studentName, gradesSummary, teacherNotes, gradeLevel, semester, targetGoal = "Chưa thiết lập", dailyLogSummary = "") => {
+            try {
+                const model = 'gemini-3-flash-preview';
+                const prompt = `
+                Đóng vai một giáo viên chủ nhiệm/bộ môn tâm huyết, có chuyên môn sâu sắc theo chương trình GDPT 2018. 
+                Hãy phân tích và viết nhận xét cho học sinh: "${studentName}" (Lớp ${gradeLevel}), Thời điểm: ${semester === 'ALL' ? 'Tổng kết năm' : semester}.
+
+                Dữ liệu đầu vào:
+                1. Mục tiêu của học sinh (Target): "${targetGoal}"
+                2. Điểm số (Grades): ${gradesSummary}
+                3. Nhật ký theo dõi hằng ngày (Daily Logs - Kiến thức/Kỹ năng/Thái độ): ${dailyLogSummary}
+                4. Ghi chú thêm của GV: "${teacherNotes}"
+
+                Yêu cầu đầu ra:
+                *Đánh giá tổng quan:* Phân tích sâu về 3 mặt: Kiến thức, Kỹ năng, Thái độ. So sánh với Mục tiêu.
+                *Lời khuyên & Định hướng (Action Plan):* Chỉ rõ 2-3 việc cụ thể cần làm.
+                *Lưu ý:* Giọng văn ân cần, sư phạm. Độ dài khoảng 150-200 chữ.
+                `;
+
+                const response = await ai.models.generateContent({ model: model, contents: prompt });
+                return response.text || "Không thể tạo nhận xét lúc này.";
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                return "Xin lỗi, đã có lỗi xảy ra khi kết nối với AI (Vui lòng kiểm tra API Key).";
+            }
+        };
+
+        // ==========================================
+        // COMPONENTS
+        // ==========================================
+
+        const OverviewTab = ({ students, classes, semester }) => {
+            const [selectedStudentId, setSelectedStudentId] = useState(students[0]?.id || '');
+
+            const selectedStudent = useMemo(() => 
+                students.find(s => s.id === selectedStudentId), 
+            [students, selectedStudentId]);
+
+            const filteredGrades = useMemo(() => {
+                if (!selectedStudent) return [];
+                return selectedStudent.grades.filter(g => {
+                    const month = new Date(g.date).getMonth() + 1;
+                    if (semester === 'HK1') return month >= 9 || month <= 1;
+                    if (semester === 'HK2') return month >= 2 && month <= 6;
+                    return true;
+                });
+            }, [selectedStudent, semester]);
+
+            const comparisonData = useMemo(() => {
+                if (!selectedStudent) return [];
+                const algebraGrades = filteredGrades.filter(g => g.subject === SubjectType.ALGEBRA);
+                const geometryGrades = filteredGrades.filter(g => g.subject === SubjectType.GEOMETRY);
+                const generalGrades = filteredGrades.filter(g => g.subject === SubjectType.GENERAL);
+                
+                const avgAlg = algebraGrades.length ? algebraGrades.reduce((sum, g) => sum + g.score, 0) / algebraGrades.length : 0;
+                const avgGeo = geometryGrades.length ? geometryGrades.reduce((sum, g) => sum + g.score, 0) / geometryGrades.length : 0;
+                const avgGen = generalGrades.length ? generalGrades.reduce((sum, g) => sum + g.score, 0) / generalGrades.length : 0;
+
+                const data = [
+                    { name: 'Đại số', score: parseFloat(avgAlg.toFixed(1)), fill: '#4F46E5' },
+                    { name: 'Hình học', score: parseFloat(avgGeo.toFixed(1)), fill: '#10B981' },
+                ];
+                if (generalGrades.length > 0) data.push({ name: 'Tổng hợp', score: parseFloat(avgGen.toFixed(1)), fill: '#F59E0B' });
+                return data;
+            }, [filteredGrades]);
+            
+            const lineChartData = useMemo(() => {
+                if (!selectedStudent) return [];
+                const sortedGrades = [...filteredGrades].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                return sortedGrades.map((g, idx) => ({
+                    idx: idx + 1,
+                    date: g.date,
+                    [g.subject]: g.score,
+                    name: new Date(g.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
+                    examType: g.examType
+                }));
+            }, [filteredGrades]);
+
+            const suggestions = useMemo(() => {
+                const today = new Date();
+                const urgentStudents = students.filter(s => {
+                    const lastLog = s.dailyLogs && s.dailyLogs.length > 0 ? new Date(s.dailyLogs[s.dailyLogs.length - 1].date) : null;
+                    const daysSinceLog = lastLog ? (today.getTime() - lastLog.getTime()) / (1000 * 3600 * 24) : 999;
+                    const recentGrade = s.grades.length > 0 ? s.grades[s.grades.length - 1] : null;
+                    const hasLowScore = recentGrade && recentGrade.score < 5;
+                    return daysSinceLog > 7 || hasLowScore;
+                }).slice(0, 5);
+                return urgentStudents;
+            }, [students]);
+
+            return (
+                <div className="space-y-6 animate-fade-in">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+                            <div className="p-3 bg-blue-100 text-blue-600 rounded-full"><Users size={24} /></div>
+                            <div><p className="text-sm text-gray-500">Tổng Học sinh</p><p className="text-2xl font-bold text-gray-800">{students.length}</p></div>
+                        </div>
+                        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+                            <div className="p-3 bg-green-100 text-green-600 rounded-full"><BookOpen size={24} /></div>
+                            <div><p className="text-sm text-gray-500">Tổng Lớp</p><p className="text-2xl font-bold text-gray-800">{classes.length}</p></div>
+                        </div>
+                        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+                            <div className="p-3 bg-purple-100 text-purple-600 rounded-full"><Award size={24} /></div>
+                            <div><p className="text-sm text-gray-500">Điểm TB Toàn trường</p><p className="text-2xl font-bold text-gray-800">{(students.reduce((acc, s) => acc + (s.grades.reduce((sum, g) => sum + g.score, 0) / (s.grades.length || 1)), 0) / students.length || 0).toFixed(1)}</p></div>
+                        </div>
+                        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+                            <div className="p-3 bg-orange-100 text-orange-600 rounded-full"><TrendingUp size={24} /></div>
+                            <div><p className="text-sm text-gray-500">Cập nhật gần nhất</p><p className="text-lg font-bold text-gray-800">Hôm nay</p></div>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg border border-red-100">
+                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><AlertCircle size={20} className="text-red-500" />Gợi ý nhắc việc hôm nay</h3>
+                            {suggestions.length > 0 ? (
+                                <div className="space-y-3">
+                                    {suggestions.map(s => (
+                                        <div key={s.id} onClick={() => setSelectedStudentId(s.id)} className="flex items-center gap-3 p-3 bg-red-50 rounded-lg cursor-pointer hover:bg-red-100 transition-colors">
+                                            <img src={s.avatar} className="w-10 h-10 rounded-full" />
+                                            <div><p className="font-bold text-gray-800 text-sm">{s.name}</p><p className="text-xs text-red-600">Cần cập nhật ghi chép/điểm số</p></div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : <div className="flex flex-col items-center justify-center h-40 text-green-600"><CheckCircle size={40} className="mb-2 opacity-50"/><p className="text-sm font-medium">Tuyệt vời! Bạn đã theo dõi sát sao tất cả học sinh.</p></div>}
+                        </div>
+                        <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+                            <div className="flex flex-col md:flex-row justify-between items-center mb-6">
+                                <h2 className="text-xl font-bold text-gray-800 mb-4 md:mb-0">Chi tiết Tiến độ - {semester === 'ALL' ? 'Cả năm' : semester}</h2>
+                                <select value={selectedStudentId} onChange={(e) => setSelectedStudentId(e.target.value)} className="p-2 border border-gray-300 rounded-lg outline-none min-w-[200px]">
+                                    {students.map(s => <option key={s.id} value={s.id}>{s.name} - {classes.find(c => c.id === s.classId)?.name}</option>)}
+                                </select>
+                            </div>
+                            {selectedStudent && (
+                                <div className="h-[250px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={lineChartData}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                            <XAxis dataKey="name" stroke="#6b7280" fontSize={12} tickMargin={10} />
+                                            <YAxis domain={[0, 10]} stroke="#6b7280" fontSize={12} />
+                                            <Tooltip contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}/>
+                                            <Legend />
+                                            <Line type="monotone" dataKey={SubjectType.GEOMETRY} name="Hình học" stroke="#10B981" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} connectNulls />
+                                            <Line type="monotone" dataKey={SubjectType.ALGEBRA} name="Đại số" stroke="#4F46E5" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} connectNulls />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    {selectedStudent && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                                <h3 className="text-lg font-semibold mb-4 text-gray-700 flex items-center"><Award size={20} className="mr-2 text-accent" />Trung bình Môn</h3>
+                                <div className="h-[250px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={comparisonData}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                            <XAxis dataKey="name" fontSize={12} />
+                                            <YAxis domain={[0, 10]} hide />
+                                            <Tooltip cursor={{fill: 'transparent'}} />
+                                            <Bar dataKey="score" radius={[8, 8, 0, 0]} barSize={40} label={{ position: 'top', fill: '#374151', fontWeight: 'bold' }}></Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 overflow-y-auto max-h-[320px]">
+                                <h3 className="text-lg font-semibold mb-4 text-gray-700">Nhật ký theo dõi gần đây</h3>
+                                {selectedStudent.dailyLogs && selectedStudent.dailyLogs.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {selectedStudent.dailyLogs.slice().reverse().map(log => (
+                                            <div key={log.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-100">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className="text-xs font-bold text-gray-500">{new Date(log.date).toLocaleDateString('vi-VN')}</span>
+                                                    <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${log.category === 'Attitude' ? 'bg-purple-100 text-purple-700' : log.category === 'Knowledge' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{log.category === 'Attitude' ? 'Thái độ' : log.category === 'Knowledge' ? 'Kiến thức' : 'Kỹ năng'}</span>
+                                                </div>
+                                                <p className="text-gray-800 text-sm">{log.content}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : <p className="text-gray-400 italic text-center py-4">Chưa có ghi chép nào.</p>}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const ClassTab = ({ classes, students, onUpdateStudent, onAddStudent, onAddStudents, onDeleteStudent, onAddClass, onUpdateClass, onDeleteClass, templates, semester }) => {
+            const [selectedClassId, setSelectedClassId] = useState(null);
+            const [selectedStudent, setSelectedStudent] = useState(null);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [modalTab, setModalTab] = useState('info');
+            const [newScore, setNewScore] = useState('');
+            const [examType, setExamType] = useState(ExamType.REGULAR);
+            const [newSubject, setNewSubject] = useState(SubjectType.ALGEBRA);
+            const [editingGradeId, setEditingGradeId] = useState(null);
+            const [logDate, setLogDate] = useState(new Date().toISOString().split('T')[0]);
+            const [logCategory, setLogCategory] = useState('Attitude');
+            const [logContent, setLogContent] = useState('');
+            const [isClassModalOpen, setIsClassModalOpen] = useState(false);
+            const [editingClass, setEditingClass] = useState(null);
+            const [classNameInput, setClassNameInput] = useState('');
+            const [classGradeInput, setClassGradeInput] = useState('6');
+            const [classYearInput, setClassYearInput] = useState(new Date().getFullYear().toString());
+            const [isEditingStudentInfo, setIsEditingStudentInfo] = useState(false);
+            const [editStudentName, setEditStudentName] = useState('');
+            const [editStudentClassId, setEditStudentClassId] = useState('');
+            const [editStudentAvatar, setEditStudentAvatar] = useState('');
+            const [editTargetGoal, setEditTargetGoal] = useState('');
+            const [editHistoricalNotes, setEditHistoricalNotes] = useState('');
+            const fileInputRef = useRef(null);
+
+            const filteredStudents = students.filter(s => {
+                const classMatch = selectedClassId === null ? true : selectedClassId === 'unassigned' ? !s.classId : s.classId === selectedClassId;
+                const searchMatch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
+                return classMatch && searchMatch;
+            });
+            const unassignedCount = students.filter(s => !s.classId).length;
+
+            const handleClassSubmit = () => {
+                if (!classNameInput.trim()) return;
+                if (editingClass) onUpdateClass({ ...editingClass, name: classNameInput, gradeLevel: classGradeInput, year: classYearInput });
+                else onAddClass({ id: `c${Date.now()}`, name: classNameInput, gradeLevel: classGradeInput, year: classYearInput });
+                setIsClassModalOpen(false);
+            };
+
+            const handleSaveGrade = () => {
+                if (!selectedStudent || !newScore) return;
+                const scoreNum = parseFloat(newScore);
+                const finalSubject = (examType === ExamType.REGULAR || examType === ExamType.MONTHLY) ? newSubject : SubjectType.GENERAL;
+                
+                if (editingGradeId) {
+                    const updatedGrades = selectedStudent.grades.map(g => g.id === editingGradeId ? { ...g, subject: finalSubject, examType, coefficient: getCoefficient(examType), score: scoreNum, date: new Date().toISOString() } : g);
+                    const updatedStudent = { ...selectedStudent, grades: updatedGrades };
+                    onUpdateStudent(updatedStudent);
+                    setSelectedStudent(updatedStudent);
+                } else {
+                    const newGrade = { id: Date.now().toString(), subject: finalSubject, examType, coefficient: getCoefficient(examType), score: scoreNum, date: new Date().toISOString() };
+                    const updatedStudent = { ...selectedStudent, grades: [...selectedStudent.grades, newGrade] };
+                    onUpdateStudent(updatedStudent);
+                    setSelectedStudent(updatedStudent);
+                }
+                setNewScore(''); setEditingGradeId(null);
+            };
+
+            const handleSaveLog = () => {
+                if (!selectedStudent || !logContent.trim()) return;
+                const newLog = { id: Date.now().toString(), date: logDate, category: logCategory, content: logContent };
+                const updatedStudent = { ...selectedStudent, dailyLogs: [...(selectedStudent.dailyLogs || []), newLog] };
+                onUpdateStudent(updatedStudent);
+                setSelectedStudent(updatedStudent);
+                setLogContent('');
+            };
+
+            const handleFileImport = async (e) => {
+                if (!e.target.files || e.target.files.length === 0) return;
+                const targetClassId = selectedClassId && selectedClassId !== 'unassigned' ? selectedClassId : (classes.length > 0 ? classes[0].id : 'c1');
+                try {
+                    const importedStudents = await parseStudentImportFile(e.target.files[0], targetClassId);
+                    if (importedStudents.length > 0) {
+                        let existingCount = 0, newCount = 0;
+                        const newStudentsList = [];
+                        importedStudents.forEach(imported => {
+                            const existing = students.find(s => s.id === imported.id || s.name === imported.name);
+                            if (existing) {
+                                const mergedGrades = [...existing.grades, ...imported.grades];
+                                const mergedComments = [...existing.comments, ...imported.comments];
+                                onUpdateStudent({ ...existing, grades: mergedGrades, comments: mergedComments });
+                                existingCount++;
+                            } else {
+                                newStudentsList.push(imported);
+                                newCount++;
+                            }
+                        });
+                        if (newStudentsList.length > 0) onAddStudents(newStudentsList);
+                        alert(`Đã hoàn tất nhập dữ liệu!\n- Cập nhật: ${existingCount} học sinh\n- Thêm mới: ${newCount} học sinh`);
+                    }
+                } catch (err) { alert(err); }
+                if (fileInputRef.current) fileInputRef.current.value = "";
+            };
+
+            return (
+                <div className="h-full flex flex-col md:flex-row gap-6 animate-fade-in">
+                    <div className="w-full md:w-64 bg-white rounded-xl shadow-sm border border-gray-100 flex-shrink-0 overflow-hidden flex flex-col">
+                        <div className="p-4 border-b border-gray-100 bg-gray-50"><h3 className="font-semibold text-gray-700">Danh sách Lớp</h3></div>
+                        <div className="overflow-y-auto flex-1 p-2 space-y-1">
+                            <button onClick={() => setSelectedClassId(null)} className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors ${selectedClassId === null ? 'bg-primary text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}>Tất cả học sinh</button>
+                            <button onClick={() => setSelectedClassId('unassigned')} className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors flex justify-between items-center ${selectedClassId === 'unassigned' ? 'bg-orange-500 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}><span className="flex items-center gap-2"><UserX size={16} /> Chưa phân lớp</span>{unassignedCount > 0 && <span className="text-xs bg-white/20 px-1.5 rounded-full">{unassignedCount}</span>}</button>
+                            {classes.map(cls => (
+                                <div key={cls.id} onClick={() => setSelectedClassId(cls.id)} className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors flex justify-between items-center group cursor-pointer ${selectedClassId === cls.id ? 'bg-primary text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}>
+                                    <span>{cls.name}</span>
+                                    <div className="flex items-center gap-1">
+                                        <button onClick={(e) => { e.stopPropagation(); setEditingClass(cls); setClassNameInput(cls.name); setClassGradeInput(cls.gradeLevel); setClassYearInput(cls.year); setIsClassModalOpen(true); }} className={`p-1.5 rounded hover:bg-white/20 ${selectedClassId === cls.id ? 'text-white' : 'text-gray-400 hover:text-gray-600'}`}><Pencil size={14} /></button>
+                                        <button onClick={(e) => { e.stopPropagation(); onDeleteClass(cls.id); }} className={`p-1.5 rounded hover:bg-white/20 ${selectedClassId === cls.id ? 'text-white' : 'text-gray-400 hover:text-red-500'}`}><Trash2 size={14} /></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="p-3 border-t border-gray-100"><button onClick={() => { setEditingClass(null); setClassNameInput(''); setClassGradeInput('6'); setIsClassModalOpen(true); }} className="w-full flex items-center justify-center gap-2 text-primary text-sm font-medium hover:bg-indigo-50 py-2 rounded-lg transition-colors"><Plus size={16} /> Thêm Lớp</button></div>
+                    </div>
+                    <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col min-h-[500px]">
+                        <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center bg-gray-50 rounded-t-xl gap-4">
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-4">
+                                    <h3 className="font-semibold text-gray-700">{selectedClassId === 'unassigned' ? 'Học sinh chưa phân lớp' : selectedClassId ? classes.find(c => c.id === selectedClassId)?.name : 'Tất cả học sinh'} <span className="ml-2 text-sm font-normal text-gray-500">({filteredStudents.length})</span></h3>
+                                    <div className="flex gap-1 border-l pl-3 ml-1 border-gray-200"><button onClick={() => exportToCSV(filteredStudents.map(s => ({ID: s.id, Name: s.name, Class: classes.find(c => c.id === s.classId)?.name, Target: s.targetGoal || '', Avg: (s.grades.reduce((a,b)=>a+(b.score * b.coefficient),0)/s.grades.reduce((a,b)=>a+b.coefficient,0) || 0).toFixed(2)})), 'Export')} className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-green-700 bg-green-50 hover:bg-green-100 rounded border border-green-200"><CloudUpload size={14} /> Excel Online</button></div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={downloadTemplate} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200"><FileDown size={14} /> Tải file mẫu</button>
+                                    <div className="relative"><input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" /><button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200"><Upload size={14} /> Nhập từ Excel</button></div>
+                                </div>
+                            </div>
+                            <div className="relative w-full sm:w-auto mt-2 sm:mt-0"><Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" /><input type="text" placeholder="Tìm học sinh..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg outline-none w-full sm:w-64" /></div>
+                        </div>
+                        <div className="p-6 overflow-y-auto flex-1">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {filteredStudents.map(student => (
+                                    <div key={student.id} onClick={() => { setSelectedStudent(student); setModalTab('info'); }} className="group relative bg-white border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all cursor-pointer hover:border-primary/50 flex flex-col justify-between">
+                                        <div className="flex items-center gap-4"><img src={student.avatar} className="w-12 h-12 rounded-full object-cover border-2 border-gray-100 group-hover:border-primary transition-colors" /><div><h4 className="font-semibold text-gray-800 group-hover:text-primary transition-colors">{student.name}</h4><p className="text-xs text-gray-500">{classes.find(c => c.id === student.classId)?.name || 'Chưa phân lớp'}</p></div></div>
+                                        <div className="mt-3">{student.targetGoal && <p className="text-xs text-indigo-600 bg-indigo-50 p-1 rounded mb-2 line-clamp-1">🎯 {student.targetGoal}</p>}</div>
+                                        <div className="mt-auto pt-3 border-t border-gray-100 flex justify-between text-xs text-gray-500"><span>ĐTB: {(student.grades.length ? (student.grades.reduce((a,b) => a+(b.score * b.coefficient),0)/student.grades.reduce((a,b) => a+b.coefficient,0)).toFixed(1) : '--')}</span><span>{student.dailyLogs?.length || 0} nhật ký</span></div>
+                                    </div>
+                                ))}
+                                <div onClick={() => { setSelectedStudent({ id: 'new', name: '', classId: selectedClassId && selectedClassId !== 'unassigned' ? selectedClassId : (classes[0] ? classes[0].id : ''), avatar: 'https://picsum.photos/200/200?random=' + Date.now(), grades: [], comments: [], dailyLogs: [] }); setModalTab('info'); }} className="border-2 border-dashed border-gray-200 rounded-xl p-4 flex flex-col items-center justify-center text-gray-400 hover:border-primary hover:text-primary hover:bg-indigo-50 transition-all cursor-pointer min-h-[140px]"><Plus size={24} /><span className="text-sm font-medium mt-2">Thêm học sinh</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    {selectedStudent && (
+                        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-end z-50 animate-fade-in" onClick={() => setSelectedStudent(null)}>
+                            <div className="w-full md:w-[700px] bg-white h-full shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+                                <div className="p-6 border-b border-gray-100 flex justify-between items-start bg-gray-50">
+                                    {selectedStudent.id === 'new' ? (
+                                        <div className="w-full"><h2 className="text-xl font-bold text-gray-800 mb-4">Thêm học sinh mới</h2><div className="space-y-4"><input type="text" placeholder="Họ và tên" value={selectedStudent.name} onChange={e => setSelectedStudent({...selectedStudent, name: e.target.value})} className="w-full p-2 border border-gray-300 rounded-lg" /><select value={selectedStudent.classId} onChange={e => setSelectedStudent({...selectedStudent, classId: e.target.value})} className="w-full p-2 border border-gray-300 rounded-lg"><option value="">-- Chưa phân lớp --</option>{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select><button onClick={() => { if(!selectedStudent.name) return; onAddStudent({...selectedStudent, id: 's'+Date.now()}); setSelectedStudent({...selectedStudent, id: 's'+Date.now()}); }} className="w-full bg-primary text-white py-2 rounded-lg font-medium">Lưu</button></div></div>
+                                    ) : (
+                                        <div className="flex w-full justify-between items-center"><div className="flex items-center gap-4"><img src={selectedStudent.avatar} className="w-16 h-16 rounded-full border-4 border-white shadow" /><div><h2 className="text-xl font-bold text-gray-800">{selectedStudent.name}</h2><p className="text-sm text-gray-500">{classes.find(c => c.id === selectedStudent.classId)?.name}</p></div></div><button onClick={() => setSelectedStudent(null)} className="p-2 hover:bg-gray-200 rounded-full"><X size={24} className="text-gray-500" /></button></div>
+                                    )}
+                                </div>
+                                {selectedStudent.id !== 'new' && (
+                                    <>
+                                        <div className="flex border-b border-gray-200 px-6"><button onClick={() => setModalTab('info')} className={`py-3 px-4 text-sm font-medium border-b-2 ${modalTab === 'info' ? 'border-primary text-primary' : 'border-transparent'}`}>Thông tin</button><button onClick={() => setModalTab('grades')} className={`py-3 px-4 text-sm font-medium border-b-2 ${modalTab === 'grades' ? 'border-primary text-primary' : 'border-transparent'}`}>Điểm số</button><button onClick={() => setModalTab('logs')} className={`py-3 px-4 text-sm font-medium border-b-2 ${modalTab === 'logs' ? 'border-primary text-primary' : 'border-transparent'}`}>Nhật ký</button></div>
+                                        <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50">
+                                            {modalTab === 'info' && (
+                                                <div className="space-y-6">
+                                                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                                                        <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-gray-800 flex items-center gap-2"><Target size={18} className="text-red-500"/> Mục tiêu & Định hướng</h3>{!isEditingStudentInfo && <button onClick={() => { setEditStudentName(selectedStudent.name); setEditTargetGoal(selectedStudent.targetGoal||''); setEditHistoricalNotes(selectedStudent.historicalNotes||''); setIsEditingStudentInfo(true); }} className="text-xs text-blue-600 font-medium">Chỉnh sửa</button>}</div>
+                                                        {isEditingStudentInfo ? (
+                                                            <div className="space-y-3"><input value={editStudentName} onChange={(e) => setEditStudentName(e.target.value)} className="w-full p-2 border rounded text-sm" placeholder="Tên" /><input value={editTargetGoal} onChange={(e) => setEditTargetGoal(e.target.value)} className="w-full p-2 border rounded text-sm" placeholder="Mục tiêu" /><textarea value={editHistoricalNotes} onChange={(e) => setEditHistoricalNotes(e.target.value)} className="w-full p-2 border rounded text-sm h-24" placeholder="Ghi chú cũ..." /><div className="flex gap-2 justify-end"><button onClick={() => setIsEditingStudentInfo(false)} className="text-gray-500 text-xs">Hủy</button><button onClick={() => { onUpdateStudent({...selectedStudent, name: editStudentName, targetGoal: editTargetGoal, historicalNotes: editHistoricalNotes}); setIsEditingStudentInfo(false); }} className="bg-primary text-white text-xs px-3 py-1.5 rounded">Lưu</button></div></div>
+                                                        ) : (
+                                                            <div className="space-y-4"><div><label className="text-xs text-gray-400 font-bold uppercase">Mục tiêu năm học</label><p className="text-gray-800 font-medium">{selectedStudent.targetGoal || 'Chưa thiết lập mục tiêu'}</p></div><div><label className="text-xs text-gray-400 font-bold uppercase">Hồ sơ quá khứ</label><p className="text-gray-600 text-sm">{selectedStudent.historicalNotes || 'Chưa có dữ liệu học bạ.'}</p></div></div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex justify-center mt-8"><button onClick={() => { onDeleteStudent(selectedStudent.id); setSelectedStudent(null); }} className="text-red-500 text-sm flex items-center gap-2 hover:bg-red-50 px-4 py-2 rounded transition-colors"><Trash2 size={16} /> Xóa học sinh này</button></div>
+                                                </div>
+                                            )}
+                                            {modalTab === 'grades' && (
+                                                <div className="space-y-4">
+                                                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm"><h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">{editingGradeId ? 'Sửa điểm' : 'Nhập điểm mới'}</h3><div className="grid grid-cols-2 gap-3 mb-3"><select value={examType} onChange={(e) => setExamType(e.target.value)} className="p-2 border rounded text-sm"><option value={ExamType.REGULAR}>Thường xuyên</option><option value={ExamType.MONTHLY}>Tháng</option><option value={ExamType.MIDTERM}>Giữa kì</option><option value={ExamType.FINAL}>Cuối kì</option></select>{(examType === ExamType.REGULAR || examType === ExamType.MONTHLY) ? <select value={newSubject} onChange={(e) => setNewSubject(e.target.value)} className="p-2 border rounded text-sm"><option value={SubjectType.ALGEBRA}>{SubjectType.ALGEBRA}</option><option value={SubjectType.GEOMETRY}>{SubjectType.GEOMETRY}</option></select> : <div className="p-2 border bg-gray-100 rounded text-sm text-gray-500 text-center">Toán chung</div>}</div><div className="flex gap-2"><input type="number" step="0.1" max="10" placeholder="Điểm (0-10)" value={newScore} onChange={(e) => setNewScore(e.target.value)} className="flex-1 p-2 border rounded text-sm" /><button onClick={handleSaveGrade} className="bg-primary text-white px-4 rounded"><Save size={18} /></button></div></div>
+                                                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden"><table className="w-full text-sm"><thead className="bg-gray-50 text-gray-500"><tr><th className="p-3 text-left">Ngày</th><th className="p-3 text-left">Loại</th><th className="p-3 text-left">Môn</th><th className="p-3 text-right">Điểm</th><th className="p-3"></th></tr></thead><tbody className="divide-y divide-gray-100">{selectedStudent.grades.slice().reverse().map(g => (<tr key={g.id} className="hover:bg-gray-50"><td className="p-3 text-gray-600">{new Date(g.date).toLocaleDateString('vi-VN')}</td><td className="p-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${g.examType === ExamType.FINAL ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>{g.examType}</span></td><td className="p-3 text-gray-800">{g.subject}</td><td className="p-3 text-right font-bold">{g.score}</td><td className="p-3 text-right"><div className="flex justify-end gap-1"><button onClick={() => { setNewScore(g.score); setExamType(g.examType); setNewSubject(g.subject); setEditingGradeId(g.id); }} className="p-1 text-gray-400 hover:text-blue-500"><Pencil size={14} /></button></div></td></tr>))}</tbody></table></div>
+                                                </div>
+                                            )}
+                                            {modalTab === 'logs' && (
+                                                <div className="space-y-6">
+                                                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-green-500"><h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Calendar size={18} className="text-green-600" /> Ghi chép hằng ngày</h3><div className="flex gap-2 mb-2"><input type="date" value={logDate} onChange={(e) => setLogDate(e.target.value)} className="p-2 border rounded text-sm" /><select value={logCategory} onChange={(e) => setLogCategory(e.target.value)} className="p-2 border rounded text-sm flex-1"><option value="Attitude">Thái độ/Ý thức</option><option value="Knowledge">Kiến thức</option><option value="Skill">Kỹ năng</option></select></div><textarea value={logContent} onChange={(e) => setLogContent(e.target.value)} className="w-full p-3 border rounded-lg text-sm h-20 mb-2" /><button onClick={handleSaveLog} className="w-full bg-green-600 text-white py-2 rounded-lg text-sm font-medium">Lưu Ghi chép</button></div>
+                                                    <div className="space-y-3"><h4 className="text-xs font-bold text-gray-400 uppercase">Lịch sử ghi chép</h4>{(selectedStudent.dailyLogs || []).slice().reverse().map(log => (<div key={log.id} className="bg-white p-3 rounded-lg border border-gray-100 hover:shadow-sm group relative"><div className="flex justify-between items-start mb-1"><div className="flex items-center gap-2"><span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{new Date(log.date).toLocaleDateString('vi-VN')}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${log.category === 'Attitude' ? 'bg-purple-100 text-purple-700' : log.category === 'Knowledge' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{log.category === 'Attitude' ? 'Thái độ' : log.category === 'Knowledge' ? 'Kiến thức' : 'Kỹ năng'}</span></div></div><p className="text-gray-800 text-sm">{log.content}</p></div>))}</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {isClassModalOpen && (
+                        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+                            <div className="bg-white rounded-xl shadow-2xl p-6 w-96"><h3 className="text-lg font-bold text-gray-800 mb-4">{editingClass ? 'Cập nhật Lớp' : 'Thêm Lớp mới'}</h3><div className="space-y-4"><div><label className="block text-sm font-medium text-gray-700 mb-1">Tên lớp</label><input type="text" value={classNameInput} onChange={(e) => setClassNameInput(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg" /></div><div className="flex gap-2 justify-end pt-2"><button onClick={() => setIsClassModalOpen(false)} className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg text-sm">Hủy</button><button onClick={handleClassSubmit} className="px-4 py-2 bg-primary text-white rounded-lg text-sm">{editingClass ? 'Cập nhật' : 'Thêm mới'}</button></div></div></div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const CommentsTab = ({ templates, setTemplates, students, classes, semester }) => {
+            const [newKeyword, setNewKeyword] = useState('');
+            const [newContent, setNewContent] = useState('');
+            const [filterCategory, setFilterCategory] = useState('All');
+            const [selectedStudentId, setSelectedStudentId] = useState('');
+            const [teacherNotes, setTeacherNotes] = useState('');
+            const [generatedComment, setGeneratedComment] = useState('');
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [copied, setCopied] = useState(false);
+
+            const handleStudentChange = (e) => {
+                const sid = e.target.value;
+                setSelectedStudentId(sid);
+                const student = students.find(s => s.id === sid);
+                if (student) {
+                     let initialNote = "";
+                     if (student.historicalNotes) initialNote += `[Học bạ cũ: ${student.historicalNotes}] `;
+                     if (student.dailyLogs && student.dailyLogs.length > 0) {
+                         const recentLogs = student.dailyLogs.slice(-3).map(l => `${l.date}: ${l.content}`).join('. ');
+                         initialNote += `[Ghi chép gần đây: ${recentLogs}]`;
+                     }
+                     setTeacherNotes(initialNote);
+                } else setTeacherNotes('');
+            };
+
+            const handleGenerateAI = async () => {
+                if (!selectedStudentId) { alert("Vui lòng chọn học sinh"); return; }
+                setIsGenerating(true); setGeneratedComment('');
+                const student = students.find(s => s.id === selectedStudentId);
+                const studentClass = classes.find(c => c.id === student?.classId);
+                const gradeLevel = studentClass?.gradeLevel || 'Khối lớp chưa xác định';
+                if (student) {
+                    const alg = student.grades.filter(g => g.subject.includes('Đại số')).map(g => g.score);
+                    const geo = student.grades.filter(g => g.subject.includes('Hình học')).map(g => g.score);
+                    const monthly = student.grades.filter(g => g.examType === 'Tháng').map(g => g.score);
+                    const summary = `Đại số: ${alg.join(', ') || 'Chưa có'}. Hình học: ${geo.join(', ') || 'Chưa có'}. Kiểm tra Tháng: ${monthly.join(', ') || 'Chưa có'}`;
+                    const logSummary = student.dailyLogs?.map(l => `[${l.category}] ${l.content}`).join('; ') || "Chưa có ghi chép hằng ngày.";
+                    const result = await generateAIComment(student.name, summary, teacherNotes, gradeLevel, semester, student.targetGoal, logSummary);
+                    setGeneratedComment(result);
+                }
+                setIsGenerating(false);
+            };
+
+            return (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full animate-fade-in">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-full overflow-hidden">
+                        <div className="p-5 border-b border-gray-100 bg-gray-50 flex justify-between items-center"><h3 className="font-bold text-gray-700 flex items-center gap-2"><Tag size={20} className="text-secondary" /> Thư viện Nhận xét</h3></div>
+                        <div className="p-5 border-b border-gray-100 bg-white"><div className="flex gap-2 mb-3"><input type="text" placeholder="Từ khóa (tot)" value={newKeyword} onChange={(e) => setNewKeyword(e.target.value)} className="w-1/3 p-2 border border-gray-300 rounded-lg text-sm" /><input type="text" placeholder="Nội dung..." value={newContent} onChange={(e) => setNewContent(e.target.value)} className="flex-1 p-2 border border-gray-300 rounded-lg text-sm" /><button onClick={() => { setTemplates([...templates, { id: Date.now().toString(), keyword: newKeyword, content: newContent, category: 'Chung' }]); setNewKeyword(''); setNewContent(''); }} className="bg-secondary text-white p-2 rounded-lg"><Plus size={20} /></button></div><div className="flex gap-2 overflow-x-auto pb-2">{['All', 'Tích cực', 'Cần cố gắng', 'Học tập'].map(cat => (<button key={cat} onClick={() => setFilterCategory(cat)} className={`text-xs px-3 py-1 rounded-full border ${filterCategory === cat ? 'bg-secondary text-white' : 'bg-gray-50'}`}>{cat}</button>))}</div></div>
+                        <div className="overflow-y-auto flex-1 p-5 space-y-3">{templates.filter(t => filterCategory === 'All' || t.category === filterCategory).map(t => (<div key={t.id} className="group bg-gray-50 p-3 rounded-lg border border-gray-100 hover:shadow-md relative"><div className="flex items-center gap-2 mb-1"><span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded uppercase">{t.keyword}</span></div><p className="text-sm text-gray-700">{t.content}</p><button onClick={() => setTemplates(templates.filter(temp => temp.id !== t.id))} className="absolute top-2 right-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 size={16} /></button></div>))}</div>
+                    </div>
+                    <div className="bg-white rounded-xl shadow-lg border border-indigo-100 flex flex-col overflow-hidden relative">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+                        <div className="p-5 border-b border-gray-100 bg-gradient-to-br from-indigo-50 to-white"><h3 className="font-bold text-gray-800 flex items-center gap-2"><Sparkles size={20} className="text-purple-600" /> Trợ lý AI Gemini (GDPT 2018)</h3></div>
+                        <div className="p-6 flex-1 overflow-y-auto">
+                            <div className="space-y-4"><div><label className="block text-sm font-medium text-gray-700 mb-1">Học sinh</label><select value={selectedStudentId} onChange={handleStudentChange} className="w-full p-2.5 border border-gray-300 rounded-lg text-sm"><option value="">-- Chọn học sinh --</option>{students.map(s => <option key={s.id} value={s.id}>{s.name} - {classes.find(c => c.id === s.classId)?.name}</option>)}</select></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú & Dữ liệu</label><textarea value={teacherNotes} onChange={(e) => setTeacherNotes(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg text-sm h-24" /></div><button onClick={handleGenerateAI} disabled={isGenerating} className={`w-full py-3 rounded-lg text-white font-medium ${isGenerating ? 'bg-gray-400' : 'bg-gradient-to-r from-indigo-600 to-purple-600'}`}>{isGenerating ? 'Đang suy nghĩ...' : <><Wand2 size={18} /> Phân tích & Tạo nhận xét</>}</button></div>
+                            {generatedComment && (<div className="mt-8 animate-fade-in"><div className="flex justify-between items-center mb-2"><h4 className="text-sm font-bold text-gray-700">Kết quả:</h4><button onClick={() => { navigator.clipboard.writeText(generatedComment); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className="text-xs flex items-center gap-1 text-gray-500">{copied ? <Check size={14} className="text-green-500"/> : <Copy size={14} />} {copied ? 'Đã sao chép' : 'Sao chép'}</button></div><div className="bg-purple-50 p-4 rounded-xl border border-purple-100"><p className="text-gray-800 text-sm whitespace-pre-line font-medium">{generatedComment}</p></div></div>)}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // ==========================================
+        // MAIN APP
+        // ==========================================
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('overview');
+            const [semester, setSemester] = useState('HK1');
+            const [teacherName, setTeacherName] = useState('Nguyễn Thu Hà');
+            const [teacherAvatar, setTeacherAvatar] = useState('https://picsum.photos/40/40');
+            const [isEditingTeacher, setIsEditingTeacher] = useState(false);
+            const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+            const [feedbackText, setFeedbackText] = useState('');
+            const [streak, setStreak] = useState(0);
+            const [classes, setClasses] = useState(MOCK_CLASSES);
+            const [students, setStudents] = useState(MOCK_STUDENTS);
+            const [templates, setTemplates] = useState(MOCK_TEMPLATES);
+            
+            // Edit Teacher Temp State
+            const [tempName, setTempName] = useState(teacherName);
+            const [tempAvatar, setTempAvatar] = useState(teacherAvatar);
+
+            useEffect(() => {
+                const today = new Date().toISOString().split('T')[0];
+                const lastVisit = localStorage.getItem('lastVisit');
+                const currentStreak = parseInt(localStorage.getItem('streak') || '0');
+                if (lastVisit === today) { setStreak(currentStreak); } 
+                else {
+                    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+                    const yesterdayString = yesterday.toISOString().split('T')[0];
+                    let newStreak = 1;
+                    if (lastVisit === yesterdayString) newStreak = currentStreak + 1;
+                    setStreak(newStreak);
+                    localStorage.setItem('streak', newStreak.toString());
+                    localStorage.setItem('lastVisit', today);
+                }
+            }, []);
+
+            const updateStudent = (updated) => setStudents(prev => prev.map(s => s.id === updated.id ? updated : s));
+            const addStudent = (newS) => setStudents(prev => [...prev, newS]);
+            const addStudents = (newSs) => setStudents(prev => [...prev, ...newSs]);
+            const deleteStudent = (id) => { if (confirm('Xóa học sinh này?')) setStudents(prev => prev.filter(s => s.id !== id)); };
+            const addClass = (newC) => setClasses(prev => [...prev, newC]);
+            const updateClass = (updated) => setClasses(prev => prev.map(c => c.id === updated.id ? updated : c));
+            const deleteClass = (id) => { if(confirm('Xóa lớp này?')) { setClasses(prev => prev.filter(c => c.id !== id)); setStudents(prev => prev.map(s => s.classId === id ? { ...s, classId: '' } : s)); } };
+
+            const handleExportAll = (type) => {
+                if (type === 'excel') exportToCSV(students.map(s => ({ID: s.id, Name: s.name, ClassID: s.classId, Avg: (s.grades.reduce((a,b)=>a+(b.score * b.coefficient),0)/s.grades.reduce((a,b)=>a+b.coefficient,0) || 0).toFixed(2)})), 'School_Report');
+                else generateClassReportPDF("TOAN TRUONG", students, semester);
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50 font-sans text-gray-800 flex">
+                    <aside className="w-20 md:w-64 bg-white border-r border-gray-200 flex flex-col fixed h-full z-10 transition-all duration-300">
+                        <div className="h-20 flex items-center justify-center md:justify-start md:px-6 border-b border-gray-100"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/Logo_Genesis_School.png/800px-Logo_Genesis_School.png?20211124041743" className="h-12 w-auto object-contain" /><span className="hidden md:hidden font-bold text-lg text-green-700 tracking-tight">Genesis School</span></div>
+                        <nav className="flex-1 py-6 space-y-2 px-2 md:px-4">
+                            <button onClick={() => setActiveTab('overview')} className={`w-full flex items-center justify-center md:justify-start p-3 rounded-xl transition-all duration-200 ${activeTab === 'overview' ? 'bg-green-50 text-green-700 shadow-sm font-semibold' : 'text-gray-500 hover:bg-gray-100'}`}><LayoutDashboard size={22} /><span className="hidden md:block ml-3">Tổng quan</span></button>
+                            <button onClick={() => setActiveTab('classes')} className={`w-full flex items-center justify-center md:justify-start p-3 rounded-xl transition-all duration-200 ${activeTab === 'classes' ? 'bg-green-50 text-green-700 shadow-sm font-semibold' : 'text-gray-500 hover:bg-gray-100'}`}><Users size={22} /><span className="hidden md:block ml-3">Lớp học</span></button>
+                            <button onClick={() => setActiveTab('comments')} className={`w-full flex items-center justify-center md:justify-start p-3 rounded-xl transition-all duration-200 ${activeTab === 'comments' ? 'bg-green-50 text-green-700 shadow-sm font-semibold' : 'text-gray-500 hover:bg-gray-100'}`}><MessageSquare size={22} /><span className="hidden md:block ml-3">Nhận xét & AI</span></button>
+                            <button onClick={() => setIsFeedbackOpen(true)} className="w-full flex items-center justify-center md:justify-start p-3 rounded-xl transition-all duration-200 text-gray-500 hover:bg-indigo-50 hover:text-indigo-700"><MessageCircle size={22} /><span className="hidden md:block ml-3">Góp ý cải thiện</span></button>
+                        </nav>
+                        <div className="p-4 border-t border-gray-100 hidden md:block"><div className="mb-4"><label className="text-xs font-semibold text-gray-500 uppercase mb-2 block">Xuất báo cáo chung</label><div className="grid grid-cols-2 gap-2"><button onClick={() => handleExportAll('pdf')} className="flex flex-col items-center justify-center p-2 bg-gray-50 hover:bg-red-50 hover:text-red-600 border border-gray-200 rounded-lg"><FileText size={18} /><span className="text-[10px] mt-1">PDF Khối</span></button><button onClick={() => handleExportAll('excel')} className="flex flex-col items-center justify-center p-2 bg-gray-50 hover:bg-green-50 hover:text-green-600 border border-gray-200 rounded-lg"><FileSpreadsheet size={18} /><span className="text-[10px] mt-1">Excel Khối</span></button></div></div></div>
+                    </aside>
+                    <main className="flex-1 ml-20 md:ml-64 p-4 md:p-8 overflow-y-auto h-screen relative">
+                        <header className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center relative z-10 gap-4">
+                            <div><h1 className="text-2xl font-bold text-gray-900">{activeTab === 'overview' ? 'Tổng quan lớp học' : activeTab === 'classes' ? 'Quản lý Học sinh' : 'Thư viện & Trợ lý AI'}</h1><p className="text-sm text-gray-500 mt-1">Hệ thống quản lý giáo dục thông minh Genesis School</p></div>
+                            <div className="flex items-center gap-3 bg-white p-2 rounded-xl shadow-sm border border-gray-200">
+                                <div className="hidden sm:flex items-center gap-1 px-3 py-1 bg-orange-50 text-orange-600 rounded-lg border border-orange-100 mr-2" title="Chuỗi ngày làm việc liên tục"><Flame size={18} className="fill-orange-500 animate-pulse" /><span className="font-bold text-sm">{streak} ngày</span></div>
+                                <div className="flex flex-col px-2 border-l border-gray-100 pl-4"><span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Học kì</span><select value={semester} onChange={(e) => setSemester(e.target.value)} className="text-sm font-bold text-green-700 bg-transparent outline-none cursor-pointer border-none p-0 focus:ring-0"><option value="HK1">Học kì I</option><option value="HK2">Học kì II</option><option value="ALL">Cả năm</option></select></div>
+                                <div className="h-8 w-px bg-gray-200 mx-1"></div>
+                                <div className="flex items-center space-x-2 pr-2 cursor-pointer hover:bg-gray-50 rounded-lg transition-colors p-1" onClick={() => { setTempName(teacherName); setTempAvatar(teacherAvatar); setIsEditingTeacher(true); }}><div className="text-right hidden sm:block"><p className="text-xs font-semibold text-gray-700">{teacherName}</p><p className="text-[10px] text-gray-400">Giáo viên CN</p></div><img src={teacherAvatar} className="w-9 h-9 rounded-full border-2 border-green-100 object-cover" /></div>
+                            </div>
+                        </header>
+                        <div className="relative z-10">
+                            {activeTab === 'overview' && <OverviewTab students={students} classes={classes} semester={semester} />}
+                            {activeTab === 'classes' && <ClassTab classes={classes} students={students} onUpdateStudent={updateStudent} onAddStudent={addStudent} onAddStudents={addStudents} onDeleteStudent={deleteStudent} onAddClass={addClass} onUpdateClass={updateClass} onDeleteClass={deleteClass} templates={templates} semester={semester} />}
+                            {activeTab === 'comments' && <CommentsTab templates={templates} setTemplates={setTemplates} students={students} classes={classes} semester={semester} />}
+                        </div>
+                        {isEditingTeacher && (<div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in"><div className="bg-white rounded-xl shadow-2xl p-6 w-96 relative"><button onClick={() => setIsEditingTeacher(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={20} /></button><h3 className="text-lg font-bold text-gray-800 mb-4">Thông tin Giáo viên</h3><div className="flex flex-col items-center mb-4"><div className="relative group cursor-pointer"><img src={tempAvatar} className="w-20 h-20 rounded-full object-cover border-4 border-gray-100 mb-2" /><div className="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Camera className="text-white" size={24} /></div></div><input type="text" placeholder="URL Ảnh" value={tempAvatar} onChange={(e) => setTempAvatar(e.target.value)} className="text-xs text-center border-b border-gray-200 outline-none w-full p-1" /></div><div className="mb-4"><label className="text-xs font-bold text-gray-500 uppercase">Tên hiển thị</label><input type="text" value={tempName} onChange={(e) => setTempName(e.target.value)} className="w-full mt-1 p-2 border border-gray-300 rounded-lg text-sm" /></div><button onClick={() => { setTeacherName(tempName); setTeacherAvatar(tempAvatar); setIsEditingTeacher(false); }} className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg">Lưu thay đổi</button></div></div>)}
+                        {isFeedbackOpen && (<div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in"><div className="bg-white rounded-xl shadow-2xl p-6 w-[500px] relative"><button onClick={() => setIsFeedbackOpen(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={20} /></button><h3 className="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2"><MessageCircle className="text-indigo-600" /> Đóng góp ý kiến</h3><p className="text-sm text-gray-500 mb-4">Ý kiến của bạn giúp EduTrack Pro ngày càng hoàn thiện hơn.</p><textarea value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} placeholder="Hãy chia sẻ suy nghĩ..." className="w-full p-4 border border-gray-300 rounded-xl h-40 focus:ring-2 focus:ring-indigo-500 outline-none mb-4" /><button onClick={() => { if(!feedbackText.trim()) return; alert("Cảm ơn thầy/cô!"); setFeedbackText(''); setIsFeedbackOpen(false); }} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-xl transition-colors flex justify-center items-center gap-2"><Send size={18} /> Gửi Góp ý</button></div></div>)}
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
