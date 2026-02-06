@@ -12,7 +12,7 @@ import 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { MOCK_CLASSES, MOCK_STUDENTS, MOCK_TEMPLATES, SubjectType, ExamType } from './types';
 
-// --- SERVICE UTILS (Đưa vào đây vì thiếu file exportService) ---
+// --- SERVICE UTILS (Hàm hỗ trợ xử lý xuất dữ liệu) ---
 const removeVietnameseTones = (str: string) => {
     str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g,"a"); 
     str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g,"e"); 
@@ -84,14 +84,20 @@ const generateClassReportPDF = (className: string, students: any[], semester: st
 };
 
 // --- API SERVICE ---
-// Sử dụng biến môi trường từ Vite
+// Lấy Key từ biến môi trường (được define trong vite.config.ts)
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ''; 
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 const generateAIComment = async (studentName: string, gradesSummary: string, teacherNotes: string, gradeLevel: string, semester: string, targetGoal = "Chưa thiết lập", dailyLogSummary = "") => {
     try {
-        if (!GEMINI_API_KEY) return "Vui lòng cài đặt API Key trong file .env hoặc Vercel Settings.";
-        const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" }); // Cập nhật model name chuẩn
+        // Kiểm tra Key TRƯỚC khi khởi tạo để tránh sập app nếu thiếu key
+        if (!GEMINI_API_KEY) {
+            return "Lỗi: Chưa cài đặt API Key. Vui lòng kiểm tra cấu hình Vercel hoặc file .env";
+        }
+
+        // Khởi tạo AI tại đây (Lazy initialization)
+        const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+        const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+        
         const prompt = `
         Đóng vai một giáo viên chủ nhiệm/bộ môn tâm huyết.
         Hãy viết nhận xét cho học sinh: "${studentName}" (Lớp ${gradeLevel}), Thời điểm: ${semester}.
@@ -102,15 +108,16 @@ const generateAIComment = async (studentName: string, gradesSummary: string, tea
         - Ghi chú GV: "${teacherNotes}"
         Yêu cầu: Đánh giá Kiến thức, Kỹ năng, Thái độ. Lời khuyên cụ thể 2-3 việc. Giọng văn ân cần. Ngắn gọn dưới 200 chữ.
         `;
+        
         const result = await model.generateContent(prompt);
         return result.response.text();
     } catch (error) {
         console.error("Gemini API Error:", error);
-        return "Lỗi kết nối AI. Vui lòng kiểm tra lại API Key.";
+        return "Lỗi kết nối AI. Vui lòng kiểm tra lại API Key và mạng internet.";
     }
 };
 
-// --- SUB-COMPONENTS (Đưa vào đây vì thiếu file component) ---
+// --- SUB-COMPONENTS (Các tab chức năng) ---
 
 const OverviewTab = ({ students, classes, semester, onSuggestionClick }: any) => {
     const [selectedStudentId, setSelectedStudentId] = useState(students[0]?.id || '');
@@ -194,7 +201,7 @@ const ClassTab = ({ classes, students, onUpdateStudent, onAddStudent, onDeleteSt
     const [selectedStudent, setSelectedStudent] = useState<any>(null);
     const [searchTerm, setSearchTerm] = useState('');
     
-    // Auto-select student if navigated from Overview
+    // Tự động chọn học sinh nếu được chuyển hướng từ Overview
     useEffect(() => {
         if (targetStudentId) {
             const student = students.find((s:any) => s.id === targetStudentId);
@@ -215,7 +222,6 @@ const ClassTab = ({ classes, students, onUpdateStudent, onAddStudent, onDeleteSt
         if (!selectedStudent) return;
         const updatedGrades = [...selectedStudent.grades, newGrade];
         onUpdateStudent({ ...selectedStudent, grades: updatedGrades });
-        // Update local state to reflect changes immediately
         setSelectedStudent({ ...selectedStudent, grades: updatedGrades });
     };
 
@@ -320,14 +326,12 @@ const CommentsTab = ({ templates, setTemplates, students, classes, semester }: a
     )
 }
 
-
 // --- MAIN APP ---
 function App() {
   const [activeTab, setActiveTab] = useState<'overview' | 'classes' | 'comments'>('overview');
   const [semester, setSemester] = useState('HK1');
   const [targetStudentId, setTargetStudentId] = useState<string | null>(null);
   const [teacherName, setTeacherName] = useState('Nguyễn Thu Hà');
-  const [isEditingTeacher, setIsEditingTeacher] = useState(false);
   const [streak, setStreak] = useState(0);
 
   // Global State
